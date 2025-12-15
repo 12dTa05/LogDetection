@@ -1,0 +1,176 @@
+import os
+import time
+import re
+import pandas as pd
+
+from drain3 import TemplateMiner
+from drain3.template_miner_config import TemplateMinerConfig
+
+
+class LogParser:
+    """
+    Parses raw log files and extracts event templates.
+    """
+    def __init__(self, log_format: str = None, depth: int = 4, st: float = 0.5):
+        """
+        Args:
+            log_format: Regex format for parsing log lines
+            depth: Drain tree depth
+            st: Similarity threshold
+        """
+        self.depth = depth
+        self.st = st
+        
+        # <Date> <Time> <Pid> <Level> <Component>: <Content>
+        self.log_format = log_format or r'<Date> <Time> <Pid> <Level> <Component>: <Content>'
+
+        self.config = TemplateMinerConfig()
+        self.config.drain_depth = depth
+        self.config.drain_sim_th = st
+        self.config.profiling_enabled = True
+        
+        self.template_miner = TemplateMiner(config=self.config)
+        
+        self.log_df = None
+    
+    def generate_logformat_regex(self, log_format: str):
+        """
+        Converts format '<Date> <Time> <Content>' to regex with named groups.
+        """
+        headers = []
+        splitters = re.split(r'(<[^<>]+>)', log_format)
+        
+        regex = ''
+        for k in range(len(splitters)):
+            if splitters[k].startswith('<'):
+                header = splitters[k].strip('<>')
+                headers.append(header)
+                regex += f'(?P<{header}>.*?)'
+            else:
+                regex += re.escape(splitters[k])
+        
+        regex = f'^{regex}$'
+        return regex, headers
+    
+    def load_log_data(self, log_file: str, regex: str, headers: list):
+        log_messages = []
+        line_count = 0
+        
+        with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                
+                line_count += 1
+                match = re.match(regex, line)
+                
+                if match:
+                    message = {header: match.group(header) for header in headers}
+                    message['LineId'] = line_count
+                    log_messages.append(message)
+                else:
+                    log_messages.append({
+                        'LineId': line_count,
+                        'Content': line
+                    })
+        
+        return pd.DataFrame(log_messages)
+    
+    def initialize_template_miner(self):
+        self.template_miner = TemplateMiner(config=self.config)
+    
+    def log_batch_progress(self, idx: int, batch_size: int, batch_start_time: float):
+        elapsed = time.time() - batch_start_time
+        print(f"Processed {idx} logs in {elapsed:.2f}s")
+    
+    def parse(self, log_file: str):
+        """
+        Args: log_file: Path to log file
+        Returns: DataFrame with LineId, Content, EventId, EventTemplate
+        """
+        regex, headers = self.generate_logformat_regex(self.log_format)
+        
+        # Load log data
+        self.log_df = self.load_log_data(log_file, regex, headers)
+        self.log_df['EventId'] = pd.Series(dtype=int)
+        self.log_df['EventTemplate'] = pd.Series(dtype=object)
+
+        self.initialize_template_miner()
+        
+        start_time = time.time()
+        batch_start_time = start_time
+        batch_size = 100000
+        
+        for idx, row in self.log_df.iterrows():
+            content = str(row.get('Content', ''))
+            result = self.template_miner.add_log_message(content)
+            
+            if idx > 0 and idx % batch_size == 0:
+                self.log_batch_progress(idx, batch_size, batch_start_time)
+                batch_start_time = time.time()
+
+            if result["change_type"] != "none":
+                self.log_change(idx, content, result)
+
+            self.log_df.loc[idx, 'EventId'] = result["cluster_id"]
+
+        for cluster in self.template_miner.drain.clusters:
+            mask = self.log_df['EventId'] == cluster.cluster_id
+            self.log_df.loc[mask, 'EventTemplate'] = cluster.get_template()
+        
+        self.finalize_parsing(start_time)
+        
+        return self.log_df
+    
+    def log_change(self, idx: int, content: str, result: dict):
+        change_type = result["change_type"]
+        cluster_id = result["cluster_id"]
+        if change_type == "cluster_created":
+            template = result.get('template_mined', '')[:80]
+            print(f"New cluster E{cluster_id}: {template}...")
+    
+    def finalize_parsing(self, start_time: float):
+        total_time = time.time() - start_time
+        num_clusters = len(self.template_miner.drain.clusters)
+        print(f"\nParsing completed in {total_time:.2f}s")
+        print(f"Total log lines: {len(self.log_df)}")
+        print(f"Total clusters (event types): {num_clusters}")
+    
+    def save_structured_logs(self, output_file: str):
+        if self.log_df is not None:
+            self.log_df.to_csv(output_file, index=False)
+            print(f"Saved structured logs to {output_file}")
+    
+    def get_event_templates(self):
+        templates = {}
+        for cluster in self.template_miner.drain.clusters:
+            templates[cluster.cluster_id] = cluster.get_template()
+        return templates
+
+
+def parse_hdfs_logs(input_file: str, output_file: str) -> pd.DataFrame:
+    log_format = r'<Date> <Time> <Pid> <Level> <Component>: <Content>'
+    
+    parser = LogParser(log_format=log_format, depth=4, st=0.5)
+    df = parser.parse(input_file)
+    parser.save_structured_logs(output_file)
+    
+    return df
+
+if __name__ == '__main__':
+    import sys
+    
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    input_file = os.path.join(project_root, 'data', 'HDFS', 'HDFS_2k.log')
+    output_file = os.path.join(project_root, 'data_processed', 'HDFS', 'HDFS_structured.csv')
+    
+    if len(sys.argv) > 1:
+        input_file = sys.argv[1]
+    if len(sys.argv) > 2:
+        output_file = sys.argv[2]
+    
+    df = parse_hdfs_logs(input_file, output_file)
+    
+    print("\nSample output:")
+    print(df[['LineId', 'EventId', 'EventTemplate']].head(10))

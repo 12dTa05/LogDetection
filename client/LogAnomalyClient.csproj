@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>LogAnomalyDetection</RootNamespace>
+    <AssemblyName>LogAnomalyDetection</AssemblyName>
+    <ApplicationIcon></ApplicationIcon>
+    <StartupObject>LogAnomalyDetection.Program</StartupObject>
+  </PropertyGroup>
+
+</Project>

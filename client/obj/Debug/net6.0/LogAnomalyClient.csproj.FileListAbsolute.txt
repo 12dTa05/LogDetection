@@ -1,0 +1,14 @@
+P:\Rust\LogAnomalyDetection\client\bin\Debug\net6.0\LogAnomalyClient.exe
+P:\Rust\LogAnomalyDetection\client\bin\Debug\net6.0\LogAnomalyClient.deps.json
+P:\Rust\LogAnomalyDetection\client\bin\Debug\net6.0\LogAnomalyClient.runtimeconfig.json
+P:\Rust\LogAnomalyDetection\client\bin\Debug\net6.0\LogAnomalyClient.dll
+P:\Rust\LogAnomalyDetection\client\bin\Debug\net6.0\LogAnomalyClient.pdb
+P:\Rust\LogAnomalyDetection\client\obj\Debug\net6.0\LogAnomalyClient.GeneratedMSBuildEditorConfig.editorconfig
+P:\Rust\LogAnomalyDetection\client\obj\Debug\net6.0\LogAnomalyClient.AssemblyInfoInputs.cache
+P:\Rust\LogAnomalyDetection\client\obj\Debug\net6.0\LogAnomalyClient.AssemblyInfo.cs
+P:\Rust\LogAnomalyDetection\client\obj\Debug\net6.0\LogAnomalyClient.csproj.CoreCompileInputs.cache
+P:\Rust\LogAnomalyDetection\client\obj\Debug\net6.0\LogAnomalyClient.dll
+P:\Rust\LogAnomalyDetection\client\obj\Debug\net6.0\refint\LogAnomalyClient.dll
+P:\Rust\LogAnomalyDetection\client\obj\Debug\net6.0\LogAnomalyClient.pdb
+P:\Rust\LogAnomalyDetection\client\obj\Debug\net6.0\LogAnomalyClient.genruntimeconfig.cache
+P:\Rust\LogAnomalyDetection\client\obj\Debug\net6.0\ref\LogAnomalyClient.dll
