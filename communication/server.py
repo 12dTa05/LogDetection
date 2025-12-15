@@ -22,6 +22,8 @@ from collections import defaultdict
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from detection.model import get_model
+from drain3 import TemplateMiner
+from drain3.template_miner_config import TemplateMinerConfig
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -93,29 +95,8 @@ class MetricsResponse(BaseModel):
     fn: int
     last_updated: str
 
-class TemplateMiner:
-    def __init__(self):
-        self.templates = {}
-        self.cluster_count = 0
-    
-    def add_log_message(self, log_message: str) -> Dict[str, Any]:
-        # Replace numbers with <NUM>
-        template = re.sub(r'\b\d+\b', '<NUM>', log_message)
-        # Replace IPs with <IP>
-        template = re.sub(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?', '<IP>', template)
-        # Replace block IDs with <*>
-        template = re.sub(r'blk_-?\d+', 'blk_<*>', template)
-        
-        if template not in self.templates:
-            self.cluster_count += 1
-            self.templates[template] = self.cluster_count
-        
-        cluster_id = self.templates[template]
-        
-        return {
-            "cluster_id": cluster_id,
-            "template_mined": template
-        }
+# TemplateMiner is now imported from drain3
+# See startup_event() for initialization with saved state
 
 app = FastAPI(title="Log Anomaly Detection API")
 
@@ -127,6 +108,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Global state - WARNING: For production with multiple workers, use Redis or Database
 # Session dict: block_id -> {templates, event_ids, label, client_ids, last_log}
 session_dict: Dict[str, Dict] = defaultdict(lambda: {
     'templates': [],
@@ -139,7 +121,7 @@ session_dict: Dict[str, Dict] = defaultdict(lambda: {
 
 log_count = 0
 recent_logs = []
-template_miner = TemplateMiner()
+template_miner = None  # Will be initialized in startup_event with drain3
 model = None
 log2id = {}
 id2log = {}
@@ -157,7 +139,7 @@ def preprocess_log(log_line: str, session_dict: Dict, template_miner: TemplateMi
     block_match = re.search(r'blk_-?\d+', log_line)
     blk_id = block_match.group() if block_match else None
     
-    # Parse template
+    # Parse template using drain3
     result = template_miner.add_log_message(log_line)
     template = result["template_mined"]
     
@@ -228,15 +210,34 @@ def load_ground_truth_labels(label_path: str):
 
 @app.on_event("startup")
 async def startup_event():
-    """Load model on startup."""
-    global model, log2id, id2log, vocab_size, window_size
+    """Load model and initialize drain3 template miner on startup."""
+    global model, log2id, id2log, vocab_size, window_size, template_miner
     
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
     model_path = os.path.join(project_root, 'detection', 'models', 'transformer_model.pt')
     data_path = os.path.join(project_root, 'data_processed', 'HDFS', 'session_data.pkl')
     label_path = os.path.join(project_root, 'data', 'HDFS', 'anomaly_label.csv')
+    drain_state_path = os.path.join(project_root, 'parsers', 'drain3_state.bin')
 
+    # Initialize drain3 TemplateMiner
+    config = TemplateMinerConfig()
+    config.drain_depth = 4
+    config.drain_sim_th = 0.5
+    config.profiling_enabled = False  # Disable profiling for production
+    
+    template_miner = TemplateMiner(config=config)
+    
+    # Try to load saved drain3 state if exists
+    if os.path.exists(drain_state_path):
+        try:
+            template_miner.load_state(drain_state_path)
+            logger.info(f"Loaded drain3 state from {drain_state_path}")
+        except Exception as e:
+            logger.warning(f"Could not load drain3 state: {e}. Using fresh instance.")
+    else:
+        logger.warning(f"Drain3 state file not found: {drain_state_path}. Using fresh instance.")
+    
     if os.path.exists(data_path):
         with open(data_path, 'rb') as f:
             data = pickle.load(f)

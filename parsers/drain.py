@@ -147,6 +147,12 @@ class LogParser:
         for cluster in self.template_miner.drain.clusters:
             templates[cluster.cluster_id] = cluster.get_template()
         return templates
+    
+    def save_drain_state(self, state_file: str):
+        """Save drain3 state for use by server."""
+        if self.template_miner is not None:
+            self.template_miner.save_state(state_file)
+            print(f"Saved drain3 state to {state_file}")
 
 
 def parse_hdfs_logs(input_file: str, output_file: str) -> pd.DataFrame:
@@ -155,6 +161,11 @@ def parse_hdfs_logs(input_file: str, output_file: str) -> pd.DataFrame:
     parser = LogParser(log_format=log_format, depth=4, st=0.5)
     df = parser.parse(input_file)
     parser.save_structured_logs(output_file)
+    
+    # Save drain3 state for server to load
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    state_file = os.path.join(project_root, 'parsers', 'drain3_state.bin')
+    parser.save_drain_state(state_file)
     
     return df
 

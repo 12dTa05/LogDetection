@@ -112,6 +112,46 @@ dotnet run
 | LSTM | ~95K | Bidirectional LSTM với optional attention |
 | CNN | ~15K | Conv2d với kernel sizes [2,3,4] |
 
+## ⚠️ Important Notes
+
+### Template Consistency (CRITICAL)
+Server sử dụng drain3 với cùng cấu hình như training để đảm bảo template nhất quán:
+- **Config**: depth=4, st=0.5
+- **State file**: `parsers/drain3_state.bin` (tự động tạo khi parse logs)
+- Nếu không tìm thấy state file, server sẽ tạo instance mới và log warning
+
+**Workflow đúng**:
+```bash
+# 1. Parse logs - tạo drain3_state.bin
+python parsers/drain.py
+
+# 2. Preprocess - tạo session_data.pkl
+python detection/preprocess_data.py
+
+# 3. Train model
+python train/train_transformer.py --model transformer
+
+# 4. Run server - load drain3 state
+python communication/server.py
+```
+
+### Production Deployment
+Xem chi tiết tại [PRODUCTION_GUIDE.md](PRODUCTION_GUIDE.md):
+- Redis/Database cho multi-workers
+- Configuration externalization
+- Security best practices
+- Scaling strategies
+
+### Client Configuration
+File `client/appsettings.json` chứa các cấu hình:
+```json
+{
+  "ServerUrl": "http://localhost:8000",
+  "DefaultModel": "Transformer",
+  "DefaultClientId": 1
+}
+```
+
 ## License
 
 MIT License
