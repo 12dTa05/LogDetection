@@ -40,7 +40,7 @@ def main():
     if args.command == 'parse':
         from parsers.drain import LogParser
         
-        output_dir = os.path.join(project_root, 'data_processed', 'HDFS')
+        output_dir = os.path.join(project_root, 'data_processed')
         os.makedirs(output_dir, exist_ok=True)
         
         log_name = os.path.splitext(os.path.basename(args.log_file))[0]

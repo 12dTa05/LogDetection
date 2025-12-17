@@ -212,6 +212,9 @@ namespace LogAnomalyDetection
 
                 if (ofd.ShowDialog() == DialogResult.OK)
                 {
+                    // Switch server to selected model before processing
+                    await SwitchServerModel();
+                    
                     cts = new CancellationTokenSource();
                     await ProcessLogFile(ofd.FileName, cts.Token);
                 }
@@ -263,7 +266,12 @@ namespace LogAnomalyDetection
 
                 try
                 {
-                    var request = new { line = line, client_id = clientId };
+                    // Include model_type in request (matches server LogLine model)
+                    var request = new { 
+                        line = line, 
+                        client_id = clientId,
+                        model_type = modelType.ToLower()  // Add model selection
+                    };
                     var json = JsonSerializer.Serialize(request);
                     var content = new StringContent(json, Encoding.UTF8, "application/json");
 
@@ -294,6 +302,34 @@ namespace LogAnomalyDetection
             AppendOutput($"\nCompleted! Total: {processedCount} lines processed.");
         }
 
+        private async Task SwitchServerModel()
+        {
+            try
+            {
+                AppendOutput($"Switching server to {modelType} model...");
+                
+                var request = new { model_type = modelType.ToLower() };
+                var json = JsonSerializer.Serialize(request);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                
+                var response = await client.PostAsync($"{serverUrl}/switch_model?model_type={modelType.ToLower()}", null);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    AppendOutput($"✓ Server switched to {modelType} model");
+                }
+                else
+                {
+                    var error = await response.Content.ReadAsStringAsync();
+                    AppendOutput($"✗ Failed to switch model: {error}");
+                }
+            }
+            catch (Exception ex)
+            {
+                AppendOutput($"✗ Error switching model: {ex.Message}");
+            }
+        }
+
         private void AppendOutput(string text)
         {
             if (txtOutput.InvokeRequired)
@@ -306,7 +342,7 @@ namespace LogAnomalyDetection
 
         private class ProcessResult
         {
-            public string result { get; set; }
+            public string? result { get; set; }
         }
     }
 
@@ -396,6 +432,7 @@ namespace LogAnomalyDetection
             {
                 Location = new Point(10, 125),
                 Size = new Size(580, 150),
+                BackColor = Color.White,
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
                 ReadOnly = true,
                 AllowUserToAddRows = false,

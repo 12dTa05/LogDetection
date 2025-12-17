@@ -4,13 +4,17 @@ import sys
 import pickle
 import torch
 from torch.utils.data import DataLoader, TensorDataset
-from detection.model import LSTM
+
+# Add project root to path BEFORE importing detection
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
+from detection.model import LSTM
+
 def main():
+    parser = argparse.ArgumentParser(description='Train LSTM model for log anomaly detection')
     parser.add_argument('--model_name', type=str, default='')
-    parser.add_argument('--hidden_size', type=int, default=100')
+    parser.add_argument('--hidden_size', type=int, default=100)
     parser.add_argument('--num_layers', type=int, default=1)
     parser.add_argument('--num_directions', type=int, default=2)
     parser.add_argument('--use_attention', action='store_true')
@@ -20,7 +24,7 @@ def main():
     parser.add_argument('--window_size', type=int, default=30)
     parser.add_argument('--stride', type=int, default=1)
     parser.add_argument('--feature_type', type=str, default='sequentials', choices=['sequentials', 'semantics'])
-    parser.add_argument('--label_type', type=str, default='next_log')
+    parser.add_argument('--label_type', type=str, default='anomaly')
     parser.add_argument('--eval_type', type=str, default='session')
     parser.add_argument('--topk', type=int, default=5)
     parser.add_argument('--use_tfidf', action='store_true')
@@ -34,7 +38,7 @@ def main():
 
     torch.manual_seed(args.random_seed)
 
-    data_path = os.path.join(project_root, 'data_processed', 'HDFS', 'session_data.pkl')
+    data_path = os.path.join(project_root, 'data_processed', 'session_data.pkl')
     
     with open(data_path, 'rb') as f:
         data = pickle.load(f)

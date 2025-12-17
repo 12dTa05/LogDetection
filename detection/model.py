@@ -1,9 +1,3 @@
-"""
-Deep Learning Models for Log Anomaly Detection
-Matches original implementation with ForecastBasedModel base class,
-CNN with Conv2d, LSTM with Attention, and fit() method.
-"""
-
 import math
 import time
 import torch
@@ -15,8 +9,6 @@ import numpy as np
 
 
 class PositionalEncoding(nn.Module):
-    """Positional encoding for Transformer."""
-    
     def __init__(self, embedding_dim: int, dropout: float = 0.1, max_len: int = 5000):
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
@@ -38,11 +30,6 @@ class PositionalEncoding(nn.Module):
 
 
 class Attention(nn.Module):
-    """
-    Attention mechanism for LSTM.
-    Matches original: self.attn = Attention(hidden_size * num_directions, window_size)
-    """
-    
     def __init__(self, hidden_size: int, window_size: int):
         super().__init__()
         self.hidden_size = hidden_size
@@ -51,12 +38,6 @@ class Attention(nn.Module):
         self.attention = nn.Linear(hidden_size, 1)
     
     def forward(self, lstm_output):
-        """
-        Args:
-            lstm_output: (batch, seq_len, hidden_size)
-        Returns:
-            context: (batch, hidden_size)
-        """
         # Attention weights
         attn_weights = self.attention(lstm_output)  # (batch, seq, 1)
         attn_weights = F.softmax(attn_weights, dim=1)
@@ -67,11 +48,6 @@ class Attention(nn.Module):
 
 
 class ForecastBasedModel(nn.Module):
-    """
-    Base class for forecast-based anomaly detection models.
-    Includes fit() method matching original implementation.
-    """
-    
     def __init__(
         self,
         meta_data: Dict[str, Any],
@@ -270,10 +246,10 @@ class Transformer(ForecastBasedModel):
     def __init__(
         self,
         meta_data: Dict[str, Any],
-        embedding_dim: int = 256,
-        nhead: int = 8,
-        num_layers: int = 4,
-        hidden_size: int = 512,
+        embedding_dim: int = 32,        # Match reference
+        nhead: int = 4,                 # Match reference
+        num_layers: int = 2,            # Match reference
+        hidden_size: int = 128,         # Match reference
         dropout: float = 0.1,
         model_save_path: str = "./transformer_models",
         feature_type: str = "sequentials",
@@ -282,7 +258,7 @@ class Transformer(ForecastBasedModel):
         topk: int = 0,
         use_tfidf: bool = False,
         freeze: bool = False,
-        gpu: int = 1,
+        gpu: int = -1,                  # Match reference (-1 = CPU default)
         **kwargs
     ):
         super().__init__(
@@ -366,7 +342,7 @@ class LSTM(ForecastBasedModel):
         num_layers: int = 1,
         window_size: int = None,
         use_attention: bool = False,
-        embedding_dim: int = 16,
+        embedding_dim: int = 32,        # Match reference
         model_save_path: str = "./lstm_models",
         feature_type: str = "sequentials",
         label_type: str = "next_log",
@@ -478,7 +454,7 @@ class CNN(ForecastBasedModel):
         meta_data: Dict[str, Any],
         kernel_sizes: List[int] = [2, 3, 4],
         hidden_size: int = 100,
-        embedding_dim: int = 16,
+        embedding_dim: int = 32,        # Match reference
         model_save_path: str = "./cnn_models",
         feature_type: str = "sequentials",
         label_type: str = "anomaly",

@@ -8,18 +8,20 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset
 from sklearn.metrics import confusion_matrix
 from typing import Dict, Any
-from detection.model import Transformer, LSTM, CNN, get_model
 
+# Add project root to path BEFORE importing detection
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
+
+from detection.model import Transformer, LSTM, CNN, get_model
 
 DEFAULT_CONFIG = {
     "model_name": "",
     "use_attention": False,
-    "hidden_size": 100,
+    "hidden_size": 128,          # Match reference (was 100)
     "num_layers": 2,
     "num_directions": 2,
-    "embedding_dim": 16,
+    "embedding_dim": 32,         # Match reference (was 16)
     "dataset": "HDFS",
     "data_dir": "../data_processed/HDFS/hdfs_1.0_tar",
     "window_size": 30,
@@ -35,7 +37,7 @@ DEFAULT_CONFIG = {
     "topk": 10,
     "patience": 3,
     "random_seed": 42,
-    "gpu": 0
+    "gpu": -1                    # Match reference (was 0)
 }
 
 
@@ -181,8 +183,9 @@ def train_cnn(meta_data: Dict, model_save_path: str, params: Dict,
     return model, best_result, history
 
 def main():
+    parser = argparse.ArgumentParser(description='Train deep learning models for log anomaly detection')
     parser.add_argument('--model', type=str, default='transformer', choices=['transformer', 'lstm', 'cnn'])
-    parser.add_argument('--data', type=str, default='data_processed/HDFS/session_data.pkl')
+    parser.add_argument('--data', type=str, default='data_processed/session_data.pkl')
     parser.add_argument('--epochs', type=int, default=100)
     parser.add_argument('--batch_size', type=int, default=1024)
     parser.add_argument('--lr', type=float, default=0.01)

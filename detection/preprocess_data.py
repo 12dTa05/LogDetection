@@ -46,7 +46,11 @@ def load_labels(label_path: str) -> dict:
                     block_id = parts[0].strip()
                     label = parts[1].strip()
                     if block_id != 'BlockId':
-                        labels[block_id] = 1 if label.lower() == 'anomaly' else 0
+                        # Handle both numeric (0/1) and text (Normal/Anomaly) labels
+                        if label.lower() in ['1', 'anomaly']:
+                            labels[block_id] = 1
+                        else:
+                            labels[block_id] = 0
     
     normal_count = sum(1 for v in labels.values() if v == 0)
     anomaly_count = sum(1 for v in labels.values() if v == 1)
@@ -107,7 +111,8 @@ def create_sliding_windows(session_dict: dict, window_size: int = 30, stride: in
             window_labels.append(0)
             window_anomalies.append(label)
         else:
-            for i in range(0, len(event_ids) - window_size, stride):
+            # Sliding window with stride
+            for i in range(0, len(event_ids) - window_size + 1, stride):
                 window = event_ids[i:i + window_size]
                 next_log = event_ids[i + window_size] if i + window_size < len(event_ids) else 0
                 
@@ -169,9 +174,9 @@ def train_test_split(features_dict: dict, train_ratio: float = 0.8,
 def preprocess_hdfs(train_anomaly_ratio: float = None):
     """Main preprocessing function for HDFS dataset."""
     # Paths
-    structured_log_path = os.path.join(project_root, 'data_processed', 'HDFS', 'HDFS_structured.csv')
-    label_path = os.path.join(project_root, 'data', 'HDFS', 'anomaly_label.csv')
-    output_path = os.path.join(project_root, 'data_processed', 'HDFS', 'session_data.pkl')
+    structured_log_path = os.path.join(project_root, 'data_processed', 'HDFS_structured.csv')
+    label_path = os.path.join(project_root, 'data', 'anomaly_label.csv')
+    output_path = os.path.join(project_root, 'data_processed', 'session_data.pkl')
     
     # Parameters
     window_size = 30

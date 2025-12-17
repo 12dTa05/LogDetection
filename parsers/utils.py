@@ -1,7 +1,6 @@
 import re
 from typing import Optional
 
-
 def extract_block_id(log_message: str) -> Optional[str]:
     match = re.search(r'blk_[-]?\d+', log_message)
     if match:

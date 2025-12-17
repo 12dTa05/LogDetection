@@ -4,18 +4,21 @@ import sys
 import pickle
 import torch
 from torch.utils.data import DataLoader, TensorDataset
-from detection.model import CNN
 
+# Add project root to path BEFORE importing detection
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
+from detection.model import CNN
+
 def main():
+    parser = argparse.ArgumentParser(description='Train CNN model for log anomaly detection')
     parser.add_argument('--model_name', type=str, default='')
     parser.add_argument('--hidden_size', type=int, default=100)
     parser.add_argument('--kernel_sizes', type=str, default='2,3,4')
     parser.add_argument('--embedding_dim', type=int, default=16)
-    parser.add_argument('--dataset', type=str, default='HDFS')
-    parser.add_argument('--data_dir', type=str, default='../data_processed/HDFS/hdfs_1.0_tar')
+    parser.add_argument('--dataset', type=str, default='./')
+    parser.add_argument('--data_dir', type=str, default='../data_processed/hdfs')
     parser.add_argument('--window_size', type=int, default=30)
     parser.add_argument('--stride', type=int, default=1, help='Stride')
     parser.add_argument('--feature_type', type=str, default='sequentials', choices=['sequentials', 'semantics'])
@@ -34,7 +37,7 @@ def main():
 
     torch.manual_seed(args.random_seed)
     
-    data_path = os.path.join(project_root, 'data_processed', 'HDFS', 'session_data.pkl')
+    data_path = os.path.join(project_root, 'data_processed', 'session_data.pkl')
     print(f"\nLoading data from {data_path}")
     
     with open(data_path, 'rb') as f:

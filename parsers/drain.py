@@ -1,33 +1,43 @@
 import os
+import sys
 import time
 import re
 import pandas as pd
 
 from drain3 import TemplateMiner
 from drain3.template_miner_config import TemplateMinerConfig
+from drain3.file_persistence import FilePersistence
+
+# Add project root to path
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
+
+from config.drain3_config import Drain3Config
 
 
 class LogParser:
-    """
-    Parses raw log files and extracts event templates.
-    """
-    def __init__(self, log_format: str = None, depth: int = 4, st: float = 0.5):
+    def __init__(self, log_format: str = None, depth: int = None, st: float = None, persistence_path: str = None):
         """
         Args:
             log_format: Regex format for parsing log lines
-            depth: Drain tree depth
-            st: Similarity threshold
+            depth: Drain tree depth (default from config)
+            st: Similarity threshold (default from config)
+            persistence_path: Path to save/load drain3 state
         """
-        self.depth = depth
-        self.st = st
+        self.depth = depth if depth is not None else Drain3Config.DEPTH
+        self.st = st if st is not None else Drain3Config.SIMILARITY_THRESHOLD
+        self.persistence_path = persistence_path
         
-        # <Date> <Time> <Pid> <Level> <Component>: <Content>
-        self.log_format = log_format or r'<Date> <Time> <Pid> <Level> <Component>: <Content>'
+        self.log_format = log_format or Drain3Config.LOG_FORMAT
 
         self.config = TemplateMinerConfig()
-        self.config.drain_depth = depth
-        self.config.drain_sim_th = st
-        self.config.profiling_enabled = True
+        self.config.drain_depth = self.depth
+        self.config.drain_sim_th = self.st
+        self.config.profiling_enabled = Drain3Config.PROFILING_ENABLED
+        
+        # Set up persistence if path provided
+        if persistence_path:
+            self.config.persistence_handler = FilePersistence(persistence_path)
         
         self.template_miner = TemplateMiner(config=self.config)
         
@@ -95,6 +105,7 @@ class LogParser:
         self.log_df = self.load_log_data(log_file, regex, headers)
         self.log_df['EventId'] = pd.Series(dtype=int)
         self.log_df['EventTemplate'] = pd.Series(dtype=object)
+        self.log_df['BlockId'] = pd.Series(dtype=object)
 
         self.initialize_template_miner()
         
@@ -114,6 +125,11 @@ class LogParser:
                 self.log_change(idx, content, result)
 
             self.log_df.loc[idx, 'EventId'] = result["cluster_id"]
+            
+            # Extract BlockId from content
+            block_match = re.search(r'blk_-?\d+', content)
+            if block_match:
+                self.log_df.loc[idx, 'BlockId'] = block_match.group()
 
         for cluster in self.template_miner.drain.clusters:
             mask = self.log_df['EventId'] == cluster.cluster_id
@@ -147,25 +163,19 @@ class LogParser:
         for cluster in self.template_miner.drain.clusters:
             templates[cluster.cluster_id] = cluster.get_template()
         return templates
-    
-    def save_drain_state(self, state_file: str):
-        """Save drain3 state for use by server."""
-        if self.template_miner is not None:
-            self.template_miner.save_state(state_file)
-            print(f"Saved drain3 state to {state_file}")
 
 
 def parse_hdfs_logs(input_file: str, output_file: str) -> pd.DataFrame:
-    log_format = r'<Date> <Time> <Pid> <Level> <Component>: <Content>'
+    # Set up persistence path
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    state_file = os.path.join(project_root, 'parsers', Drain3Config.STATE_FILE)
     
-    parser = LogParser(log_format=log_format, depth=4, st=0.5)
+    # Use config defaults (no need to specify depth and st)
+    parser = LogParser(persistence_path=state_file)
     df = parser.parse(input_file)
     parser.save_structured_logs(output_file)
     
-    # Save drain3 state for server to load
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    state_file = os.path.join(project_root, 'parsers', 'drain3_state.bin')
-    parser.save_drain_state(state_file)
+    print(f"Drain3 state automatically saved to {state_file}")
     
     return df
 
@@ -173,8 +183,8 @@ if __name__ == '__main__':
     import sys
     
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    input_file = os.path.join(project_root, 'data', 'HDFS', 'HDFS_2k.log')
-    output_file = os.path.join(project_root, 'data_processed', 'HDFS', 'HDFS_structured.csv')
+    input_file = os.path.join(project_root, 'data', 'HDFS.log')  # Updated to use full dataset
+    output_file = os.path.join(project_root, 'data_processed', 'HDFS_structured.csv')
     
     if len(sys.argv) > 1:
         input_file = sys.argv[1]
